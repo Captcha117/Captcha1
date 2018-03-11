@@ -1,0 +1,261 @@
+# ysp
+# Default settings for the simulation
+#
+
+## Scenario settings
+Scenario.name = default_scenario
+Scenario.simulateConnections = true
+Scenario.updateInterval = 0.1
+# 43200s == 12h
+#Scenario.endTime = 43200
+Scenario.endTime = 86400
+
+
+## Interface-specific settings:
+# type : which interface class the interface belongs to
+# For different types, the sub-parameters are interface-specific
+# For SimpleBroadcastInterface, the parameters are:
+# transmitSpeed : transmit speed of the interface (bytes per second) 
+# transmitRange : range of the interface (meters)
+
+# "Bluetooth" interface for all nodes
+btInterface.type = SimpleBroadcastInterface
+# Transmit speed of 2 Mbps = 250kBps
+btInterface.transmitSpeed = 250k
+btInterface.transmitRange = 10
+#btInterface.transmitRange = 3000
+
+# High speed, long range, interface
+highspeedInterface.type = SimpleBroadcastInterface
+highspeedInterface.transmitSpeed = 10M
+highspeedInterface.transmitRange = 3000
+
+#RSU interface
+rsuInterface.type = SimpleBroadcastInterface
+rsuInterface.transmitSpeed = 10M
+rsuInterface.transmitRange = 3300
+
+# PV interface
+pvInterface.type = SimpleBroadcastInterface
+pvInterface.transmitSpeed = 10M
+pvInterface.transmitRange = 30
+
+##################################
+# Define different node groups
+Scenario.nrofHostGroups = 13
+
+## Group-specific settings:
+# groupID : Group's identifier. Used as the prefix of host names
+# nrofHosts: number of hosts in the group
+# movementModel: movement model of the hosts (valid class name from movement package)
+# waitTime: minimum and maximum wait times (seconds) after reaching destination
+# speed: minimum and maximum speeds (m/s) when moving on a path
+# bufferSize: size of the message buffer (bytes)
+# router: router used to route messages (valid class name from routing package)
+# activeTimes: Time intervals when the nodes in the group are active (start1, end1, start2, end2, ...)
+# msgTtl : TTL (minutes) of the messages created by this host group, default=infinite
+
+## Group and movement model specific settings
+# pois: Points Of Interest indexes and probabilities (poiIndex1, poiProb1, poiIndex2, poiProb2, ... )
+#       for ShortestPathMapBasedMovement
+# okMaps : which map nodes are OK for the group (map file indexes), default=all 
+#          for all MapBasedMovent models
+# routeFile: route's file path - for MapRouteMovement
+# routeType: route's type - for MapRouteMovement
+
+
+# Common settings for all groups
+Group.movementModel = ShortestPathMapBasedMovement
+Group.router = EpidemicRouter
+#Group.router = TwoJumpRouter
+Group.bufferSize = 5M
+Group.waitTime = 0, 120
+# All nodes have the bluetooth interface
+Group.nrofInterfaces = 1
+Group.interface1 = btInterface
+# Walking speeds
+#Group.speed = 0.5, 1.5
+# Message TTL of 300 minutes (5 hours)
+Group.msgTtl = 300
+Group.groupID = m
+Group.nrofHosts = 1
+Group.routeFile = data/xiamen.wkt
+#Group.routeType = MessageRouter
+#Group.routeType = TwoJumpRouter
+
+# group1  specific settings
+Group1.groupID = rsu
+Group1.nrofHosts = 1
+Group1.interface1 = rsuInterface
+Group1.movementModel = StationaryMovement
+Group1.nodeLocation = 6300,4800
+
+Group2.groupID = rsu
+Group2.nrofHosts = 1
+Group2.interface1 = rsuInterface
+Group2.movementModel = StationaryMovement
+Group2.nodeLocation = 9000,4000
+
+Group3.groupID = rsu
+Group3.nrofHosts = 1
+Group3.interface1 = rsuInterface
+Group3.movementModel = StationaryMovement
+Group3.nodeLocation = 13000,8400
+
+Group4.groupID = rsu
+Group4.nrofHosts = 1
+Group4.interface1 = rsuInterface
+Group4.movementModel = StationaryMovement
+Group4.nodeLocation = 6000,7500
+
+Group5.groupID = rsu
+Group5.nrofHosts = 1
+Group5.interface1 = rsuInterface
+Group5.movementModel = StationaryMovement
+Group5.nodeLocation = 12500,11000
+
+Group6.groupID = rsu
+Group6.nrofHosts = 1
+Group6.interface1 = rsuInterface
+Group6.movementModel = StationaryMovement
+Group6.nodeLocation = 5800,10000
+
+Group7.groupID = rsu
+Group7.nrofHosts = 1
+Group7.interface1 = rsuInterface
+Group7.movementModel = StationaryMovement
+Group7.nodeLocation = 12500,5500
+
+Group8.groupID = rsu
+Group8.nrofHosts = 1
+Group8.interface1 = rsuInterface
+Group8.movementModel = StationaryMovement
+Group8.nodeLocation = 10000,12000
+
+Group9.groupID = rsu
+Group9.nrofHosts = 1
+Group9.interface1 = rsuInterface
+Group9.movementModel = StationaryMovement
+Group9.nodeLocation = 8000,13500
+
+Group10.groupID = rsu
+Group10.nrofHosts = 1
+Group10.interface1 = rsuInterface
+Group10.movementModel = StationaryMovement
+Group10.nodeLocation = 5500,12500
+
+Group11.groupID = rsu
+Group11.nrofHosts = 1
+Group11.interface1 = rsuInterface
+Group11.movementModel = StationaryMovement
+Group11.nodeLocation = 10000,6800
+
+Group12.groupID = pv
+Group12.nrofHosts = 3
+Group12.interface1 = pvInterface
+Group12.movementModel = MessageBasedMovement
+Group12.nodeLocation = 13000,700
+Group12.routeType = 2
+
+#Group3.groupID = pv
+#Group3.nrofHosts = 1
+#Group3.interface1 = pvInterface
+#Group3.movementModel = MessageBasedMovement
+#Group3.nodeLocation = 8000,3000
+#Group3.routeType = 2
+
+Group13.groupID = request
+Group13.nrofHosts = 1
+Group13.interface1 = pvInterface
+Group13.movementModel = MapRouteMovement
+Group13.routeType = 2
+Group13.waitTime = 0, 0
+Group13.speed = 0, 0
+Group13.routeFile = data/requestrouteFile.wkt
+
+## Message creation parameters 
+# How many event generators
+#Events.nrof = 1
+# Class of the first event generator
+#Events1.class = MessageEventGenerator
+# (following settings are specific for the MessageEventGenerator class)
+# Creation interval in seconds (one new message every 25 to 35 seconds)
+#Events1.interval = 25,35
+# Message sizes (500kB - 1MB)
+#Events1.size = 500k,1M
+# range of message source/destination addresses
+#Events1.hosts = 0,9
+#Events1.tohosts = 0,9
+# Message ID prefix
+#Events1.prefix = M
+
+## Message creation parameters 
+# How many event generators
+Events.nrof = 1
+# Class of the first event generator
+Events1.class = ExternalEventsQueue
+# (following settings are specific for the MessageEventGenerator class)
+# Creation interval in seconds (one new message every 25 to 35 seconds)
+#Events1.interval = 25,35
+# Message sizes (500kB - 1MB)
+#Events1.size = 500k,1M
+# range of message source/destination addresses 包括下界，不包括上界
+#Events1.hosts = 11,14
+#Events1.tohosts = 0,14
+# Message ID prefix
+Events1.filePath = mytestinputevent.txt
+
+# 随机种子
+## Movement model settings
+# seed for movement models' pseudo random number generator (default = 0)
+MovementModel.rngSeed = 1
+# World's size for Movement Models without implicit size (width, height; meters)
+#MovementModel.worldSize = 73521, 70000
+MovementModel.worldSize = 20000, 20000
+
+# How long time to move hosts in the world before real simulation
+MovementModel.warmup = 1000
+
+## Map based movement -movement model specific settings
+
+MapBasedMovement.nrofMapFiles = 1
+MapBasedMovement.mapFile1 = data/xiamen.wkt
+
+
+## Reports - all report names have to be valid report classes
+
+# how many reports to load
+Report.nrofReports = 1
+# length of the warm up period (simulated seconds)
+Report.warmup = 0
+# default directory of reports (can be overridden per Report with output setting)
+Report.reportDir = reports/
+# Report classes to load
+Report.report1 = MessageStatsReport
+
+## Default settings for some routers settings
+ProphetRouter.secondsInTimeUnit = 30
+SprayAndWaitRouter.nrofCopies = 6
+SprayAndWaitRouter.binaryMode = true
+
+## Optimization settings -- these affect the speed of the simulation
+## see World class for details.
+Optimization.cellSizeMult = 5
+Optimization.randomizeUpdateOrder = true
+
+
+## GUI settings
+
+# GUI underlay image settings
+GUI.UnderlayImage.fileName = data/helsinki_underlay.png
+# Image offset in pixels (x, y)
+GUI.UnderlayImage.offset = 64, 20
+# Scaling factor for the image
+GUI.UnderlayImage.scale = 4.75
+# Image rotation (radians)
+GUI.UnderlayImage.rotate = -0.015
+
+# how many events to show in the log panel (default = 30)
+GUI.EventLogPanel.nrofEvents = 100
+# Regular Expression log filter (see Pattern-class from the Java API for RE-matching details)
+#GUI.EventLogPanel.REfilter = .*p[1-9]<->p[1-9]$
