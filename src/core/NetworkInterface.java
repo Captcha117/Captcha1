@@ -355,6 +355,8 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 	 */
 	public abstract void connect(NetworkInterface anotherInterface);
 
+	
+	//连接建立时
 	/**
 	 * Connects this host to another host. The derived class should check that all pre-requisites for making a connection are satisfied before actually connecting.
 	 * 
@@ -378,7 +380,7 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 		System.out.println("ConnectionUp:" + con.toString());
 		// System.out.println("("+con.fromNode.getType()+")"+"("+con.toNode.getType()+")");
 
-		if (con.fromNode.getType() + con.toNode.getType() == 1)
+		if (con.fromNode.getType() + con.toNode.getType() == 1) //PV&RSU
 		{
 			DTNHost tempRSU, tempPV;
 			if (con.fromNode.getType() == 1)
@@ -391,39 +393,13 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 				tempPV = con.fromNode;
 				tempRSU = con.toNode;
 			}
-			Double tempDetour = 0.0;
+			//RSU在PV列表中添加PV
 			tempRSU.getPvList().add(tempPV);
-			// System.out.print(tempRSU.toString() + ":");
-			for (int i = 0; i < tempRSU.getPvList().size(); i++)
-			{
-				// System.out.print(tempRSU.getPvList().get(i) + " ");
-				tempDetour += tempRSU.getPvList().get(i).getLoad();
-			}
-			tempRSU.setLoad(tempDetour / tempRSU.getPvList().size());
-			// System.out.println(tempRSU.getLoad());
-		}
-		else if (con.fromNode.getType() + con.toNode.getType() == 3)
-		{
-			DTNHost tempRSU, tempRequest;
-			if (con.fromNode.getType() == 1)
-			{
-				tempRSU = con.fromNode;
-				tempRequest = con.toNode;
-			}
-			else
-			{
-				tempRequest = con.fromNode;
-				tempRSU = con.toNode;
-			}
-			if (tempRequest.getBelongTo() == null)
-			{
-				tempRequest.setBelongTo(tempRSU);
-				System.out.println(tempRequest+".."+tempRequest.getBelongTo());
-			}
 		}
 
 	}
 
+	//断开连接时
 	/**
 	 * Disconnects this host from another host. The derived class should make the decision whether to disconnect or not
 	 * 
@@ -446,7 +422,7 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 
 		// System.out.println("ConnectionDown:" + con.toString());
 
-		if (con.fromNode.getType() + con.toNode.getType() == 1)
+		if (con.fromNode.getType() + con.toNode.getType() == 1)//RSU&PV
 		{
 			DTNHost tempRSU, tempPV;
 			if (con.fromNode.getType() == 1)
@@ -459,6 +435,7 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 				tempPV = con.fromNode;
 				tempRSU = con.toNode;
 			}
+			//RSU在PV列表中删除PV
 			for (int i = 0; i < tempRSU.getPvList().size(); i++)
 			{
 				if (tempRSU.getPvList().get(i).toString().equals(tempPV.toString()))
@@ -467,22 +444,6 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 					i--;
 				}
 			}
-			Double tempDetour = 0.0;
-			// System.out.print(tempRSU.toString() + ":");
-			for (int i = 0; i < tempRSU.getPvList().size(); i++)
-			{
-				// System.out.print(tempRSU.getPvList().get(i) + " ");
-				tempDetour += tempRSU.getPvList().get(i).getLoad();
-			}
-			if (tempRSU.getPvList().size() == 0)
-			{
-				tempRSU.setLoad(0.0);
-			}
-			else
-			{
-				tempRSU.setLoad(tempDetour / tempRSU.getPvList().size());
-			}
-			// System.out.println(tempRSU.getLoad());
 		}
 	}
 
@@ -498,7 +459,7 @@ abstract public class NetworkInterface implements ModuleCommunicationListener
 		double smallerRange = anotherInterface.getTransmitRange();
 		double myRange = getTransmitRange();
 		if (myRange > smallerRange)
-		{ // 婧愮爜鏄�夋嫨灏忕殑鑼冨洿锛岀幇鍦ㄦ敼鎴愰�夋嫨澶х殑鑼冨洿
+		{ 
 			smallerRange = myRange;
 		}
 

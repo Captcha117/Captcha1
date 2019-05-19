@@ -14,6 +14,8 @@ import core.Coord;
 import core.DTNHost;
 import core.Message;
 import core.World;
+import movement.map.MapNode;
+import movement.map.PointsOfInterest;
 
 /**
  * External event for creating a message.
@@ -23,6 +25,8 @@ public class MessageCreateEventMy extends MessageEvent
 	private int size;
 	private int responseSize;
 	static private int count = 0;
+	
+	
 
 	/**
 	 * Creates a message creation event with a optional response request
@@ -58,11 +62,13 @@ public class MessageCreateEventMy extends MessageEvent
 		DTNHost from = world.getNodeByAddress(this.fromAddr);
 
 		Message m = new Message(from, to, this.id, this.size);
-
+		
+		//System.out.println("MessageCreate:"+from+" "+to);
 		int orig = 1;
 		int des = 1;
 		Double waitMin = 0.0;
 		Double waitMax = 0.0;
+		String rsuNo = null;
 
 		File file = new File("destinationFile.txt");
 		BufferedReader reader = null;
@@ -79,7 +85,9 @@ public class MessageCreateEventMy extends MessageEvent
 			// line++;
 			// }
 			for (int i = 0; i < count; i++)
+			{
 				tempString = reader.readLine();
+			}
 			tempString = reader.readLine();
 			// System.out.println(tempString);
 			String[] destString = tempString.split(" ");
@@ -87,6 +95,7 @@ public class MessageCreateEventMy extends MessageEvent
 			des = Integer.parseInt(destString[1]);
 			waitMin = Double.parseDouble(destString[2]);
 			waitMax = Double.parseDouble(destString[3]);
+			rsuNo = destString[4];
 			count++;
 
 			reader.close();
@@ -96,11 +105,13 @@ public class MessageCreateEventMy extends MessageEvent
 			e.printStackTrace();
 		}
 
-		m.addProperty("origin", orig);
-		m.addProperty("destination", des);
-		m.addProperty("waitMin", waitMin);
-		m.addProperty("waitMax", waitMax);
-		m.addProperty("fromNode", from.getBelongTo());
+		m.addProperty("origin", orig);	//请求起点
+		m.addProperty("destination", des);	//请求终点
+		m.addProperty("waitMin", waitMin);	//请求最小等待距离，已无效
+		m.addProperty("waitMax", waitMax);	//请求最大等待距离，已无效
+		//m.addProperty("fromNode", from.getBelongTo());
+
+		m.addProperty("fromNode", "rsu"+rsuNo);	//初始RSU
 		int transmit_times = 0;
 		m.addProperty("transmit_times", transmit_times);
 		m.setResponseSize(this.responseSize);

@@ -4,6 +4,10 @@
  */
 package core;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -11,11 +15,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
 
 import movement.MovementModel;
 import movement.Path;
-import movement.map.MapNode;
 import routing.MessageRouter;
 import routing.util.RoutingInfo;
 
@@ -49,37 +51,31 @@ public class DTNHost implements Comparable<DTNHost>
 	public static final int TYPE_RSU = 1;
 	public static final int TYPE_REQUEST = 2;
 
-	public static final Double DETOUR_RATIO = 1.5;
-
-	private int newPath;
-	private Path tempPath;
+	///////////
+	public static final Double DETOUR_RATIO = 0.5; // 绕行阈值
+	public static final Double WAIT_RATIO = 0.5; // 等待阈值
 
 	private List<DTNHost> pvList = null;
 
 	private Map<DTNHost, Double> costMap = null;
-	private Map<DTNHost, Message> DM = null;
 	private List<List<Double>> extraCost = null;
 	private int flag = 0;
 	private Double load = 0.0;
 
-	private List<Integer> pickList = null;
-	private List<Integer> toList = null;
-	private List<DTNHost> requestList = null; // accept
-	private List<Message> messageList = null;
-	private List<Integer> serviceState = null; // servicing
-	private List<Double> waitList = null;
-	private List<Double> detourList = null;
-	private List<Message> serviceOrder = null;
-	private int campacity; // pvs' max campacity
-	private int acceptNumber; // accept but not service
-	private int inServiceNumber;
-	private List<Double> goDistance = null;
-	private Double distanceDifference = 0.0;
+	private List<Integer> pickList = null; // pick列表
+	private List<Integer> toList = null; // to列表
+	private List<DTNHost> requestList = null; // 接受的请求列表
+	private List<Message> messageList = null; // 消息列表
+	private List<Integer> serviceState = null; // 服务状态列表
+	private List<Double> waitList = null; // 等待列表
+	private List<Double> detourList = null; // 绕行距离列表
+	private List<Message> serviceOrder = null; // 服务顺序列表
+	private int campacity; // PV最大容量
+	private int acceptNumber; // 接受但未上车的请求数
+	private int inServiceNumber; // 已上车的请求数
+	private List<Double> goDistance = null; // 已行驶的距离列表
+	private List<Double> odList = null; // od列表
 
-	private int pvNumber; // nodes' pv number
-
-	private DTNHost belongTo;
-	
 	static
 	{
 		DTNSim.registerForReset(DTNHost.class.getCanonicalName());
@@ -107,8 +103,6 @@ public class DTNHost implements Comparable<DTNHost>
 	public DTNHost(List<MessageListener> msgLs, List<MovementListener> movLs, String groupId, List<NetworkInterface> interf, ModuleCommunicationBus comBus,
 			MovementModel mmProto, MessageRouter mRouterProto)
 	{
-		this.newPath = 0;
-		this.tempPath = null;
 		this.comBus = comBus;
 		this.location = new Coord(0, 0);
 		this.address = getNextAddress();
@@ -131,21 +125,19 @@ public class DTNHost implements Comparable<DTNHost>
 			this.waitList = new ArrayList<Double>();
 			this.detourList = new ArrayList<Double>();
 			this.serviceOrder = new ArrayList<Message>();
-			this.distanceDifference = 0.0;
 			this.goDistance = new ArrayList<Double>();
+			this.odList = new ArrayList<Double>();
 		}
 		else if (groupId.equals("rsu"))
 		{
 			this.type = TYPE_RSU;
 			this.costMap = new HashMap<DTNHost, Double>();
-			this.DM = new HashMap<DTNHost, Message>();
-			
+
 			this.pvList = new ArrayList<DTNHost>();
 		}
 		else
 		{
 			this.type = TYPE_REQUEST;
-			this.belongTo=null;
 		}
 
 		for (NetworkInterface i : interf)
@@ -514,6 +506,7 @@ public class DTNHost implements Comparable<DTNHost>
 		}
 		// System.out.println("update:"+this.toString());
 
+		// 更新PV的destination
 		if (this.getType() == TYPE_PV)
 		{
 			// if(this.location!=this.lastLocation )
@@ -651,9 +644,11 @@ public class DTNHost implements Comparable<DTNHost>
 	 */
 	public void sendMessage(String id, DTNHost to)
 	{
+		System.out.println("send:" + id + " " + to);
 		this.router.sendMessage(id, to);
 	}
 
+	// 收到消息
 	/**
 	 * Start receiving a message from another host
 	 * 
@@ -665,166 +660,175 @@ public class DTNHost implements Comparable<DTNHost>
 	 */
 	public int receiveMessage(Message m, DTNHost from)
 	{
+
 		int retVal = this.router.receiveMessage(m, from);
 		if (retVal == MessageRouter.RCV_OK)
 		{
 			m.addNodeOnPath(this); // add this node on the messages path
 
-			// this=pv,rsu/to
-			// from=request,rsu/from
-			// m=m1 etc.
-
-			//System.out.println(from + "--(" + m + ")->" + this.getName());
+			// System.out.println(from + "--(" + m + ")->" + this.getName());
 
 			// System.out.println(this.getName() + "收到来自"+from+"消息" + m);
 			// 加上接收后的处理
-			// edit by spyang
 
-			if (this.type == TYPE_PV)
+			// RSU收到消息
+			if (this.type == TYPE_RSU && m.getProperty("fromNode").equals(this.getName()))
 			{
+				long startTime = System.currentTimeMillis();
+				System.out.println("┏━━━━" + from + "---" + m + "-->" + this + "━━━━┓");
 				int orig = (Integer) m.getProperty("origin");
 				int des = (Integer) m.getProperty("destination");
-				Double waitMin = (Double) m.getProperty("waitMin");
-				Double waitMax = (Double) m.getProperty("waitMax");
+				// Double waitMin = (Double) m.getProperty("waitMin");
+				// Double waitMax = (Double) m.getProperty("waitMax");
+				// DTNHost exactFromNode = this;
 
-				System.out.println("origin:" + orig + ",des:" + des + ",min:" + waitMin + ",max:" + waitMax);
+				System.out.println(this + " " + this.pvList.size());
+				System.out.println(this.pvList);
 				
-				DTNHost exactFromNode = (DTNHost) m.getProperty("fromNode");
-				System.out.println(this.toString()+" ---Exactfrom:" + exactFromNode);
-				if (orig + des == 0)
+				//对范围内的PV进行计算
+				for (int v = 0; v < this.pvList.size(); v++)
 				{
-					return retVal;
-				}
-				extraCost.clear();
-				flag = 0;
-				System.out.println(this.getName() + "开始计算");
-				Double temp = movement.cost(this, orig, des);
-				if (temp >= waitMin && temp <= waitMax)
-				{
-					if (path != null && path.hasNext())
+					DTNHost tempPV = pvList.get(v);
+
+					if (orig + des == 0)
 					{
-						extraCost = movement.getContinuePathByDestination(destination, orig, des);
-						if (extraCost.size() == 0)
+						return retVal;
+					}
+					//超载，舍去
+					if (tempPV.getAcceptNumber() >= tempPV.campacity)
+					{
+						System.out.println(tempPV.toString() + "容量已为" + tempPV.getAcceptNumber() + "," + "拒绝" + m);
+						File file = new File("result/接受请求.txt");
+						try
 						{
-							System.out.println("绕行大于阈值," + this.toString() + "拒绝" + m);
-
+							BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+							writer.write(tempPV.toString() + "容量已满,拒绝" + m + "\r\n");
+							writer.flush();
+							writer.close();
 						}
-						else
+						catch (IOException e)
 						{
-							int temp1 = 0;
-							System.out.println("额外花费:");
-							for (int i = 0; i < extraCost.size(); i++)
-							{
-								if (movement.insertCheck(this, m, extraCost.get(i)))
-								{
+							e.printStackTrace();
+						}
+						continue;
+					}
+					// System.out.println("┏━━━━" + from + "---" + m + "-->" + tempPV + "━━━━┓");
+					System.out.println("od:(" + orig + "," + des + ")" + ",from:" + this);
 
-									//System.out.println(this + "插入" + m + "的方法：");
-									System.out.println(extraCost.get(i));
-									flag = 1;
-									temp1 = 1;
-								}
-								else
+					// System.out.println(tempPV.toString()+" ---Exactfrom:" + exactFromNode);
+
+					tempPV.extraCost.clear();
+					tempPV.flag = 0;
+					System.out.println(tempPV.getName() + "开始计算" + m);
+					Double temp = tempPV.movement.cost(tempPV, orig, des); // 计算响应m的最短距离
+					if (temp / tempPV.movement.odDistance(m) <= DTNHost.WAIT_RATIO) // 若在等待率范围之内
+					{
+						if (tempPV.path != null && tempPV.path.hasNext()) // 若车有既定路线(已响应了其他请求)
+						{
+							tempPV.extraCost = tempPV.movement.getContinuePathByDestination(tempPV.destination, orig, des);
+							if (tempPV.extraCost.size() == 0) // 如果额外消耗列表为空
+							{
+								System.out.println("绕行大于阈值," + tempPV.toString() + "拒绝" + m);
+
+							}
+							else
+							{
+								int temp1 = 0;
+								System.out.println("额外花费:[代价 o d 绕行 序号]");
+								for (int i = 0; i < tempPV.extraCost.size(); i++)
 								{
-									extraCost.remove(i);
-									i--;
+									if (tempPV.movement.insertCheck(tempPV, m, tempPV.extraCost.get(i)))
+									{
+
+										// System.out.println(tempPV + "插入" + m + "的方法：");
+										System.out.println(tempPV.extraCost.get(i));
+										tempPV.flag = 1;
+										temp1 = 1;
+									}
+									else
+									{
+										tempPV.extraCost.remove(i);
+										i--;
+									}
+								}
+
+								// List<Double> lessCost = movement.findMinLength(extraCost);
+								// exactFromNode.costMap.put(tempPV, lessCost.get(3));
+								if (temp1 == 1)
+								{
+									// System.out.println("EXACT"+exactFromNode.toString());
+									System.out.println(this);
+									this.costMap.put(tempPV, tempPV.movement.findMinLength(tempPV.extraCost).get(3));
+									// exactFromNode.DM.put(tempPV, m);
 								}
 							}
 
-							// List<Double> lessCost = movement.findMinLength(extraCost);
-							// exactFromNode.costMap.put(this, lessCost.get(3));
-							if (temp1 == 1)
-							{
-								//System.out.println("EXACT"+exactFromNode.toString());
-								System.out.println(exactFromNode);
-								exactFromNode.costMap.put(this, movement.findMinLength(extraCost).get(3));
-								exactFromNode.DM.put(this, m);
-							}
 						}
+						else if (path == null) // 如果路线为空
+						{
 
+							// path = movement.getPathByDestination(orig, des);
+
+							// tempPV.destination = path.getNextWaypoint();
+							// System.out.println(path.getSpeed());
+
+							// exactFromNode.costMap.put(tempPV, movement.cost(orig, des));
+
+							this.costMap.put(tempPV, 0.0);
+
+							// exactFromNode.DM.put(tempPV, m);
+							tempPV.flag = 2;
+						}
 					}
-					else if (path == null)
+					else
 					{
-
-						// path = movement.getPathByDestination(orig, des);
-
-						// this.destination = path.getNextWaypoint();
-						// System.out.println(path.getSpeed());
-
-						// exactFromNode.costMap.put(this, movement.cost(orig, des));
-
-						exactFromNode.costMap.put(this, 0.0);
-
-						exactFromNode.DM.put(this, m);
-						flag = 2;
-
+						System.out.println("等待率为" + temp / tempPV.movement.odDistance(m) + "大于阈值," + tempPV.toString() + "拒绝" + m);
 					}
 				}
-				else
-				{
-					System.out.println("等待时间大于阈值," + this.toString() + "拒绝" + m);
-				}
-				// from.costMap.pit(this,);
 
-				// path = movement.getPathByDestination(des);
-				// this.destination = path.getNextWaypoint();
-				// System.out.println(path.getSpeed());
-				// path=null;
-			}
-
-			else if (this.type == TYPE_RSU)
-			{
-				
 				/*
 				 * System.out.println("++"); Iterator<Entry<Message, DTNHost>> e2 = fromDM.entrySet().iterator(); while (e2.hasNext()) { Entry<Message, DTNHost> it =
 				 * e2.next(); System.out.println("Key = " + it.getKey() + ", Value = " + it.getValue());
 				 * 
 				 * } System.out.println("++");
 				 */
-				if (!costMap.isEmpty() && !DM.isEmpty())
+				if (!costMap.isEmpty()) // costMap不为空
 				{
 					System.out.println(this.getName() + "开始计算");
 					DTNHost tempHost = null;
-					Message tempMessage = null;
+					Message tempMessage = m;
 					double min = -1;
 
 					Iterator<Entry<DTNHost, Double>> entry = costMap.entrySet().iterator();
-					Iterator<Entry<DTNHost, Message>> entry2 = DM.entrySet().iterator();
+					// Iterator<Entry<DTNHost, Message>> entry2 = DM.entrySet().iterator();
 
 					System.out.println("costMap");
 					while (entry.hasNext())
 					{
 						Entry<DTNHost, Double> it = entry.next();
-						System.out.println("Key = " + it.getKey().toString() + ", Value = " + it.getValue() + ",flag = " + it.getKey().flag);
-						if (min == -1 || min != -1 && it.getValue() < min)
+						System.out.println("Key = " + it.getKey().toString() + ", Value = " + it.getValue() + ", flag = " + it.getKey().flag);
+						if (min == -1 || min != -1 && it.getValue() < min) // 找到使cost取最小值的车
 						{
 							tempHost = it.getKey();
 							min = it.getValue();
 						}
 					}
-					System.out.println("DM");
-					while (entry2.hasNext())
-					{
-						Entry<DTNHost, Message> it2 = entry2.next();
-						System.out.println("Key = " + it2.getKey().toString() + ", Value = " + it2.getValue());
-						if (it2.getKey() == tempHost)
-						{
-							tempMessage = it2.getValue();
-							break;
-						}
-					}
+					/*
+					 * System.out.println("DM"); while (entry2.hasNext()) { Entry<DTNHost, Message> it2 = entry2.next(); System.out.println("Key = " +
+					 * it2.getKey().toString() + ", Value = " + it2.getValue()); if (it2.getKey() == tempHost) { tempMessage = it2.getValue(); break; } }
+					 */
 					// System.out.println("minCost:" + min);
 
-					if (tempHost.flag == 1)// path!=null
+					if (tempHost.flag == 1)// 车的path不为空
 					{
-						System.out.println(tempHost.getName() + "extraCost");
-						for (int i = 0; i < tempHost.extraCost.size(); i++)
-						{
-							System.out.println(tempHost.extraCost.get(i));
-						}
+						/*
+						 * System.out.println(tempHost.getName() + "extraCost"); for (int i = 0; i < tempHost.extraCost.size(); i++) {
+						 * System.out.println(tempHost.extraCost.get(i)); }
+						 */
 						tempHost.path = tempHost.movement.insert(tempHost, tempMessage);
 
 					}
-					else if (tempHost.flag == 2)// path==null
+					else if (tempHost.flag == 2)// 车的path为空
 					{
 						System.out.println("Messagefrom:" + tempMessage.getFrom());
 						tempHost.path = tempHost.movement.getPathByDestination((Integer) tempMessage.getProperty("origin"),
@@ -837,28 +841,48 @@ public class DTNHost implements Comparable<DTNHost>
 						tempHost.serviceOrder.add(tempMessage);
 						tempHost.serviceOrder.add(tempMessage);
 					}
-					System.out.println(tempHost.toString() + "接受了" + tempMessage.toString());
-					tempHost.pickList.add((Integer) tempMessage.getProperty("origin"));
-					tempHost.toList.add((Integer) tempMessage.getProperty("destination"));
-					tempHost.requestList.add(tempMessage.getFrom());
-					tempHost.messageList.add(tempMessage);
-					tempHost.serviceState.add(0);
-					tempHost.acceptNumber++;
-					tempHost.goDistance.add(0.0);
-					Double s = 0.0;
-					for (int i = 0; i < tempHost.detourList.size(); i++)
+
+					if (tempHost.flag != 0)//更新PV所有状态
 					{
-						s = s + tempHost.detourList.get(i);
+						System.out.println(tempHost.toString() + "接受了" + tempMessage.toString());
+						long endTime = System.currentTimeMillis();
+						File file = new File("result/接受请求.txt");
+						try
+						{
+							BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+							writer.write(tempMessage + " " + tempHost + " " + (endTime - startTime) + "\r\n");
+							writer.flush();
+							writer.close();
+						}
+						catch (IOException e)
+						{
+							e.printStackTrace();
+						}
+
+						tempHost.pickList.add((Integer) tempMessage.getProperty("origin"));
+						tempHost.toList.add((Integer) tempMessage.getProperty("destination"));
+						tempHost.odList.add(tempHost.movement.odDistance(tempMessage));
+						tempHost.requestList.add(tempMessage.getFrom());
+						tempHost.messageList.add(tempMessage);
+						tempHost.serviceState.add(0);
+						tempHost.acceptNumber++;
+						tempHost.goDistance.add(0.0);
+						Double s = 0.0;
+						for (int i = 0; i < tempHost.detourList.size(); i++)
+						{
+							s = s + tempHost.detourList.get(i);
+						}
+						// tempHost.load = s / tempHost.acceptNumber;
+
+						printState(tempHost);
+						// System.out.println(tempHost + "容量:" + tempHost.requestNumber);
 					}
-					tempHost.load = s / tempHost.acceptNumber;
-					printState(tempHost);
-					// System.out.println(tempHost + "容量:" + tempHost.requestNumber);
 				}
 
 				costMap.clear();
-				DM.clear();
 			}
-			System.out.println("----------------------------------------");
+
+			// System.out.println("┗━━━━" + from + "---" + m + "-->" + this + "━━━━┛");
 			// if((int)m.getProperty("transmit_times") >= 2)
 			// {
 			// retVal = MessageRouter.DENIED_UNSPECIFIED;
@@ -871,21 +895,23 @@ public class DTNHost implements Comparable<DTNHost>
 		return retVal;
 	}
 
+	//PV状态
 	public void printState(DTNHost host)
 	{
 		System.out.println(host.toString());
 		System.out.println("[起点列表]	" + host.getPickList());
 		System.out.println("[终点列表]	" + host.getToList());
 		System.out.println("[经过顺序]	" + host.getServiceOrder());
-		//System.out.println("[请求列表]	" + host.getRequestList());
+		// System.out.println("[请求列表] " + host.getRequestList());
 		System.out.println("[消息列表]	" + host.getMessageList());
-		System.out.println("[是否接到人]	" + host.getServiceState());
+		System.out.println("[是否接载]	" + host.getServiceState());
 		System.out.println("[经过距离]	" + host.getGoDistance());
 		System.out.println("[等待距离]	" + host.getWaitList());
 		System.out.println("[绕行距离]	" + host.getDetourList());
+		System.out.println("[最短距离]	" + host.getOdList());
 		System.out.println("[接受请求数]	" + host.getAcceptNumber());
-		System.out.println("[服务请求数]	" + host.getInServiceNumber());
-		System.out.println("[负载]		" + host.getLoad());
+		System.out.println("[已接载数]	" + host.getInServiceNumber());
+		// System.out.println("[负载] " + host.getLoad());
 	}
 
 	/**
@@ -1081,18 +1107,8 @@ public class DTNHost implements Comparable<DTNHost>
 		return goDistance;
 	}
 
-	public Double getDistanceDifference()
+	public List<Double> getOdList()
 	{
-		return distanceDifference;
-	}
-
-	public DTNHost getBelongTo()
-	{
-		return belongTo;
-	}
-
-	public void setBelongTo(DTNHost belongTo)
-	{
-		this.belongTo = belongTo;
+		return odList;
 	}
 }

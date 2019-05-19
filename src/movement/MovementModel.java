@@ -355,22 +355,22 @@ public abstract class MovementModel
 		// TODO Auto-generated method stub
 		return null;
 	}
-	
+
 	public Path insert(DTNHost tempHost, Message tempMessage)
 	{
 		// TODO Auto-generated method stub
 		return null;
 	}
-	
+
 	public List<MapNode> getDestinationList()
 	{
 		return null;
 	}
 
-	public void checkDestination(Coord tempDestination,DTNHost host)
+	public void checkDestination(Coord tempDestination, DTNHost host)
 	{
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	public boolean insertCheck(DTNHost dtnHost, Message m, List<Double> list)
@@ -378,4 +378,12 @@ public abstract class MovementModel
 		// TODO Auto-generated method stub
 		return false;
 	}
+
+	public Double odDistance(Message m)
+	{
+		System.out.println("!@#");
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }
