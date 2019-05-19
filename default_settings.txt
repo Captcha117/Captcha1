@@ -33,7 +33,7 @@ highspeedInterface.transmitRange = 3000
 #RSU interface
 rsuInterface.type = SimpleBroadcastInterface
 rsuInterface.transmitSpeed = 10M
-rsuInterface.transmitRange = 3300
+rsuInterface.transmitRange = 4000
 
 # PV interface
 pvInterface.type = SimpleBroadcastInterface
@@ -42,7 +42,7 @@ pvInterface.transmitRange = 30
 
 ##################################
 # Define different node groups
-Scenario.nrofHostGroups = 13
+Scenario.nrofHostGroups = 15
 
 ## Group-specific settings:
 # groupID : Group's identifier. Used as the prefix of host names
@@ -76,7 +76,7 @@ Group.interface1 = btInterface
 # Walking speeds
 #Group.speed = 0.5, 1.5
 # Message TTL of 300 minutes (5 hours)
-Group.msgTtl = 300
+Group.msgTtl = 2
 Group.groupID = m
 Group.nrofHosts = 1
 Group.routeFile = data/xiamen.wkt
@@ -88,7 +88,7 @@ Group1.groupID = rsu
 Group1.nrofHosts = 1
 Group1.interface1 = rsuInterface
 Group1.movementModel = StationaryMovement
-Group1.nodeLocation = 6300,4800
+Group1.nodeLocation = 4000,2000
 
 Group2.groupID = rsu
 Group2.nrofHosts = 1
@@ -100,13 +100,13 @@ Group3.groupID = rsu
 Group3.nrofHosts = 1
 Group3.interface1 = rsuInterface
 Group3.movementModel = StationaryMovement
-Group3.nodeLocation = 13000,8400
+Group3.nodeLocation = 14000,8400
 
 Group4.groupID = rsu
 Group4.nrofHosts = 1
 Group4.interface1 = rsuInterface
 Group4.movementModel = StationaryMovement
-Group4.nodeLocation = 6000,7500
+Group4.nodeLocation = 4800,7500
 
 Group5.groupID = rsu
 Group5.nrofHosts = 1
@@ -124,7 +124,7 @@ Group7.groupID = rsu
 Group7.nrofHosts = 1
 Group7.interface1 = rsuInterface
 Group7.movementModel = StationaryMovement
-Group7.nodeLocation = 12500,5500
+Group7.nodeLocation = 15000,2500
 
 Group8.groupID = rsu
 Group8.nrofHosts = 1
@@ -136,26 +136,38 @@ Group9.groupID = rsu
 Group9.nrofHosts = 1
 Group9.interface1 = rsuInterface
 Group9.movementModel = StationaryMovement
-Group9.nodeLocation = 8000,13500
+Group9.nodeLocation = 8000,13000
 
 Group10.groupID = rsu
 Group10.nrofHosts = 1
 Group10.interface1 = rsuInterface
 Group10.movementModel = StationaryMovement
-Group10.nodeLocation = 5500,12500
+Group10.nodeLocation = 4000,13000
 
 Group11.groupID = rsu
 Group11.nrofHosts = 1
 Group11.interface1 = rsuInterface
 Group11.movementModel = StationaryMovement
-Group11.nodeLocation = 10000,6800
+Group11.nodeLocation = 10000,7000
 
-Group12.groupID = pv
-Group12.nrofHosts = 3
-Group12.interface1 = pvInterface
-Group12.movementModel = MessageBasedMovement
-Group12.nodeLocation = 13000,700
-Group12.routeType = 2
+Group12.groupID = rsu
+Group12.nrofHosts = 1
+Group12.interface1 = rsuInterface
+Group12.movementModel = StationaryMovement
+Group12.nodeLocation = 12000,5000
+
+Group13.groupID = rsu
+Group13.nrofHosts = 1
+Group13.interface1 = rsuInterface
+Group13.movementModel = StationaryMovement
+Group13.nodeLocation = 5500,4300
+
+Group14.groupID = pv
+Group14.nrofHosts = 1
+Group14.interface1 = pvInterface
+Group14.movementModel = MessageBasedMovement
+Group14.nodeLocation = 13000,700
+Group14.routeType = 2
 
 #Group3.groupID = pv
 #Group3.nrofHosts = 1
@@ -164,14 +176,14 @@ Group12.routeType = 2
 #Group3.nodeLocation = 8000,3000
 #Group3.routeType = 2
 
-Group13.groupID = request
-Group13.nrofHosts = 1
-Group13.interface1 = pvInterface
-Group13.movementModel = MapRouteMovement
-Group13.routeType = 2
-Group13.waitTime = 0, 0
-Group13.speed = 0, 0
-Group13.routeFile = data/requestrouteFile.wkt
+Group15.groupID = request
+Group15.nrofHosts = 1
+Group15.interface1 = pvInterface
+Group15.movementModel = MapRouteMovement
+Group15.routeType = 2
+Group15.waitTime = 0, 0
+Group15.speed = 0, 0
+Group15.routeFile = data/requestrouteFile.wkt
 
 ## Message creation parameters 
 # How many event generators

@@ -4,7 +4,9 @@
  */
 package movement;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -93,6 +95,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 	// }
 
 	// edit by spyang
+	// 获取路径
 	@Override
 	public Path getPath()
 	{
@@ -106,9 +109,9 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		return p;
 	}
 
+	// 计算花费
 	public Double cost(DTNHost host, int origin, int des)
 	{
-
 		MapNode pick = pois.selectExactDestination(origin);
 		MapNode to = pois.selectExactDestination(des);
 		// List<MapNode> nodePath = pathFinder.getShortestPath(lastMapNode, pick);
@@ -120,9 +123,9 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		// System.out.println(lastMapNode);
 		// System.out.println("=-=-=-=---");
 
-		List<MapNode> odPath = pathFinder.getShortestPath(pick, to);
-		Double odLength = calculateLength(odPath);
-		System.out.println("odLength:" + odLength);
+		// List<MapNode> odPath = pathFinder.getShortestPath(pick, to);
+		// Double odLength = calculateLength(odPath);
+		// System.out.println("odLength:" + odLength);
 
 		// this assertion should never fire if the map is checked in read phase
 
@@ -132,6 +135,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 	}
 
 	// edited by spyang
+	// 当路径为空时，PV添加请求后的路径
 	public Path getPathByDestination(int origin, int des)
 	{
 		Path p = new Path(generateSpeed());
@@ -172,7 +176,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		return p;
 	}
 
-	// edit by spyang
+	// 插入算法计算路径
 	public List<List<Double>> getContinuePathByDestination(Coord location, int orig, int des)
 	{
 		// 表示乘客的起点和目的地是否在当前的路径地点集合中的变量judge
@@ -359,32 +363,10 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 				}
 			}
 		}
-
-		/*
-		 * 
-		 * // if(judge == 0) // { // 选择插入的位置 ////List<Double> insertLocation = findMinLength(extraCost); // 必须按照先插入终点，后插入起点的顺序插入 ////destinationList.add((new
-		 * Double(insertLocation.get(0)).intValue()), pick); destinationList.add((new Double(insertLocation.get(1)).intValue()), to); //
-		 * System.out.println(insertLocation.get(0)+" "+insertLocation.get(1)+" " + host.getName()); // }
-		 * 
-		 * // System.out.println(destinationList+" " + host.getName()); // System.out.println(destinationList+" "+getHost().getName()); // 根据destinationList获取路径
-		 * List<List<MapNode>> pathList = new ArrayList<List<MapNode>>(); for (int i = 0; i < destinationList.size() - 1; i++) { if (i == 0)
-		 * pathList.add(pathFinder.getShortestPath(nowLocation, destinationList.get(i))); pathList.add(pathFinder.getShortestPath(destinationList.get(i),
-		 * destinationList.get(i + 1))); }
-		 * 
-		 * for (int i = 0; i < pathList.size(); i++) { for (int j = 0; j < pathList.get(i).size(); j++) { p.addWaypoint(pathList.get(i).get(j).getLocation()); } }
-		 * 
-		 * // this assertion should never fire if the map is checked in read phase // assert nodePath.size() > 0 : "No path from " + lastMapNode + " to " + // to +
-		 * ". The simulation map isn't fully connected";
-		 * 
-		 * // for (MapNode node : nodePath) { // create a Path from the shortest path // p.addWaypoint(node.getLocation()); // } // lastMapNode = to; lastMapNode =
-		 * destinationList.get(destinationList.size() - 1);
-		 * 
-		 * // return p;
-		 * 
-		 */
 		return extraCost;
 	}
 
+	// 插入判断
 	public boolean insertCheck(DTNHost host, Message message, List<Double> extraCost)
 	{
 		int orig = (Integer) message.getProperty("origin");
@@ -423,6 +405,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 			tempDistanceList.add(tempDestinationList.get(k).getLocation().distance(tempDestinationList.get(k + 1).getLocation()));
 		}
 
+		// 判断插入后其他请求的绕行率与等待率
 		for (int i = 0; i < host.getMessageList().size(); i++)
 		{
 			if (host.getPickList().get(i) != -1)
@@ -452,15 +435,14 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 							{
 								tempDistance += tempDistanceList.get(k);
 							}
-							if (tempDistance >= (Double) host.getMessageList().get(i).getProperty("waitMin")
-									&& tempDistance <= (Double) host.getMessageList().get(i).getProperty("waitMax"))
+							if (tempDistance / odLength <= DTNHost.WAIT_RATIO)
 							{
 								break;
 							}
 							else
 							{
-								System.out.println(
-										host.toString() + extraCost + "插入" + message.toString() + "后,导致" + tempServiceOrder.get(j) + "的等待距离变为" + tempDistance + ",故拒绝");
+								System.out.println(host.toString() + extraCost + "插入" + message.toString() + "后,导致" + tempServiceOrder.get(j) + "的等待率变为"
+										+ tempDistance / odLength + ",故拒绝");
 								return false;
 							}
 						}
@@ -513,6 +495,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		return true;
 	}
 
+	// 路径插入
 	public Path insert(DTNHost host, Message message)
 	{
 		Coord location = host.getDestination();
@@ -536,9 +519,9 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 
 		List<MapNode> odPath = pathFinder.getShortestPath(pick, to);
 		Double odLength = calculateLength(odPath);
-		// 必须按照先插入终点，后插入起点的顺序插入
+
 		host.getDetourList().add(insertLocation.get(3));
-		host.setLoad(host.getLoad() + insertLocation.get(3));
+		// host.setLoad(host.getLoad() + insertLocation.get(3));
 		host.getServiceOrder().add((new Double(insertLocation.get(1)).intValue()), message);
 		host.getServiceOrder().add((new Double(insertLocation.get(2)).intValue()), message);
 
@@ -607,7 +590,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 			}
 			else
 			{
-				for (int j = 0; j <host.getServiceOrder().size(); j++)
+				for (int j = 0; j < host.getServiceOrder().size(); j++)
 				{
 					if (host.getServiceOrder().get(j) == host.getMessageList().get(i))
 					{
@@ -618,14 +601,13 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 						}
 						if (tempDistance / odLength <= DTNHost.DETOUR_RATIO)
 						{
-							host.getDetourList().set(i, tempDistance/odLength);
+							host.getDetourList().set(i, tempDistance / odLength);
 							break;
 						}
 					}
 				}
 			}
 		}
-		
 
 		List<List<MapNode>> pathList = new ArrayList<List<MapNode>>();
 		for (int i = 0; i < destinationList.size() - 1; i++)
@@ -645,24 +627,21 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 				p.addWaypoint(pathList.get(i).get(j).getLocation());
 			}
 		}
-		System.out.println(host.toString() + " destinationList:");
-		for (int i = 0; i < destinationList.size(); i++)
+
+		/*
+		 * System.out.println(host.toString() + " destinationList:"); for (int i = 0; i < destinationList.size(); i++) { System.out.print(destinationList.get(i) + " "); }
+		 * System.out.println("\npathList:"); for (int i = 0; i < pathList.size(); i++) { System.out.println(pathList.get(i)); } System.out.println();
+		 */
+		lastMapNode = destinationList.get(destinationList.size() - 1);
+		for (int j = 0; j < destinationList.size(); j++)
 		{
-			System.out.print(destinationList.get(i) + " ");
-		}
-		System.out.println("\npathList:");
-		for (int i = 0; i < pathList.size(); i++)
-		{
-			System.out.println(pathList.get(i));
+			System.out.print(destinationList.get(j) + " ");
 		}
 		System.out.println();
-		lastMapNode = destinationList.get(destinationList.size() - 1);
-
 		return p;
 	}
 
-	// edited by spyang
-	// calcute the nodePath's Length
+	// 计算路径长度
 	public Double calculateLength(List<MapNode> nodePath)
 	{
 		MapNode pre = nodePath.get(0);
@@ -676,7 +655,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		return length;
 	}
 
-	// edited by spyang
+	// 寻找最短路径
 	public List<Double> findMinLength(List<List<Double>> extraCost)
 	{
 		List<Double> temp = new ArrayList<Double>();
@@ -706,6 +685,7 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 		return temp;
 	}
 
+	// 判断PV是否到达目的地
 	public void checkDestination(Coord tempDestination, DTNHost host)
 	{
 		for (int i = 0; i < destinationList.size(); i++)
@@ -719,22 +699,20 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 				}
 				System.out.println();
 
-				exist(tempDestination, host);
-				destinationList.remove(i);
-				i--;
+				if (checkPick(tempDestination, host) + checkTo(tempDestination, host) != 0)
+				{
+					destinationList.remove(i);
+					i--;
+				}
 			}
 		}
 
 	}
 
-	public boolean exist(Coord tempDestination, DTNHost host)
+	// 判断目的地是否为请求起点
+	public int checkPick(Coord tempDestination, DTNHost host)
 	{
-		// MapNode pick = pois.selectExactDestination(orig);
-		// MapNode to = pois.selectExactDestination(des);
-		if (host.getPath() == null)
-		{
-			host.setLoad(0.0);
-		}
+		int flag = 0;
 		for (int i = 0; i < host.getPickList().size(); i++)
 		{
 			if (host.getPickList().get(i) == -1)
@@ -743,9 +721,24 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 			}
 			else if (pois.selectExactDestination(host.getPickList().get(i)) == getMap().getNodeByCoord(new Coord(tempDestination.getX(), tempDestination.getY())))
 			{
+				flag = 1;
 				Message tempMessage = host.getMessageList().get(i);
 				host.getPickList().set(i, -1);
 				host.getServiceState().set(i, 1);
+
+				File file = new File("result/上车.txt");
+				try
+				{
+					BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+					writer.write(tempMessage + " ↑ " + host.getGoDistance().get(i) + " " + (host.getGoDistance().get(i) / host.getOdList().get(i)) + "\r\n");
+					writer.flush();
+					writer.close();
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+
 				for (int j = 0; j < host.getServiceOrder().size(); j++)
 				{
 					if (host.getServiceOrder().get(j) == tempMessage)
@@ -756,15 +749,39 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 				}
 
 				host.setInServiceNumber(host.getInServiceNumber() + 1);
+				host.printState(host);
+				break;
 			}
-
 		}
+		return flag;
+	}
+
+	// 判断目的地是否为请求终点
+	public int checkTo(Coord tempDestination, DTNHost host)
+	{
+		int flag = 0;
 		for (int i = 0; i < host.getToList().size(); i++)
 		{
 			if (pois.selectExactDestination(host.getToList().get(i)) == getMap().getNodeByCoord(new Coord(tempDestination.getX(), tempDestination.getY()))
 					&& host.getPickList().get(i) == -1)
 			{
+				flag = 1;
 				Message tempMessage = host.getMessageList().get(i);
+
+				File file = new File("result/下车.txt");
+				try
+				{
+					BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+					writer.write(tempMessage + " ↓ " + (host.getGoDistance().get(i)) + " "
+							+ ((host.getGoDistance().get(i) - host.getWaitList().get(i)) / host.getOdList().get(i)) + "\r\n");
+					writer.flush();
+					writer.close();
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+
 				for (int j = 0; j < host.getServiceOrder().size(); j++)
 				{
 					if (host.getServiceOrder().get(j) == tempMessage)
@@ -778,52 +795,39 @@ public class MessageBasedMovement extends MapBasedMovement implements Switchable
 				host.getRequestList().remove(i);
 				host.getServiceState().remove(i);
 				host.getWaitList().remove(i);
+				host.getOdList().remove(i);
 				host.getMessageList().remove(i);
 				host.getDetourList().remove(i);
 				host.getGoDistance().remove(i);
 				host.setAcceptNumber(host.getAcceptNumber() - 1);
 				host.setInServiceNumber(host.getInServiceNumber() - 1);
-				if (host.getToList().size() == 0)
-				{
-					host.setLoad(0.0);
-				}
-				else
-				{
-					Double s = 0.0;
-					for (int j = 0; j < host.getDetourList().size(); j++)
-					{
-						s = s + host.getDetourList().get(j);
-					}
-					host.setLoad(s / host.getAcceptNumber());
-				}
+
+				host.printState(host);
+				/*
+				 * if (host.getToList().size() == 0) { host.setLoad(0.0); } else { Double s = 0.0; for (int j = 0; j < host.getDetourList().size(); j++) { s = s +
+				 * host.getDetourList().get(j); } host.setLoad(s / host.getAcceptNumber()); }
+				 */
 				i--;
+				break;
 			}
 		}
 
-		printState(host);
-		return false;
-	}
+		return flag;
 
-	public void printState(DTNHost host)
-	{
-		System.out.println(host.toString());
-		System.out.println("[起点列表]	" + host.getPickList());
-		System.out.println("[终点列表]	" + host.getToList());
-		System.out.println("[经过顺序]	" + host.getServiceOrder());
-		//System.out.println("[请求列表]	" + host.getRequestList());
-		System.out.println("[消息列表]	" + host.getMessageList());
-		System.out.println("[是否接到人]	" + host.getServiceState());
-		System.out.println("[经过距离]	" + host.getGoDistance());
-		System.out.println("[等待距离]	" + host.getWaitList());
-		System.out.println("[绕行距离]	" + host.getDetourList());
-		System.out.println("[接受请求数]	" + host.getAcceptNumber());
-		System.out.println("[服务请求数]	" + host.getInServiceNumber());
-		System.out.println("[负载]		" + host.getLoad());
 	}
 
 	@Override
 	public MessageBasedMovement replicate()
 	{
 		return new MessageBasedMovement(this);
+	}
+
+	// 计算OD距离
+	public Double odDistance(Message m)
+	{
+		MapNode pick = pois.selectExactDestination((Integer) m.getProperty("origin"));
+		MapNode to = pois.selectExactDestination((Integer) m.getProperty("destination"));
+		List<MapNode> nodePath = pathFinder.getShortestPath(pick, to);
+		return calculateLength(nodePath);
 	}
 }
